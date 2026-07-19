@@ -52,7 +52,15 @@ func main() {
 }
 ```
 
-Sources can be an image URL, a base64 string, or a `data:` URI. Timeouts and cancellation flow through `context.Context`.
+Sources can be an image URL, a base64 string, or a `data:` URI. For local files, readers, or in-memory bytes:
+
+```go
+source, err := pictomancer.SourceFromPath("photo.jpg")
+source, err = pictomancer.SourceFromReader(file)
+source = pictomancer.SourceFromBytes(data)
+```
+
+Timeouts and cancellation flow through `context.Context`.
 
 ### Operations
 
