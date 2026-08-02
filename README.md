@@ -80,6 +80,25 @@ client.Pipeline(ctx, source, []pictomancer.PipelineOperation{
 
 Operations return an `OpResult`: `Bytes` holds the optimized image for inline delivery, `Receipt` holds the JSON receipt for `put_url`/`callback` deliveries.
 
+### Perceptual quality target
+
+Instead of guessing a `Q`, ask compress/convert for the smallest file with SSIM >= target. The server binary-searches the encoder quality and reports the outcome in `X-Pictomancer-Quality-*` headers, surfaced as `OpResult.Quality`:
+
+```go
+result, err := client.Compress(ctx, source, pictomancer.CompressParams{
+	Format:        "webp", // required with QualityTarget
+	QualityTarget: 0.95,   // 0 < v <= 1; mutually exclusive with Q
+})
+if err != nil {
+	panic(err)
+}
+if result.Quality != nil {
+	// result.Quality.Achieved (e.g. 0.9530), .QFinal, .Encodes
+}
+```
+
+Supported for `jpeg`, `webp` and `avif` outputs; on convert it is also invalid with `Lossless: true`. Not available inside pipelines. `Quality` is nil when no search ran - either no `QualityTarget` was sent, or the input already met the target and came back untouched (`X-Pig-Billed: 0`).
+
 ### Delivery targets
 
 ```go

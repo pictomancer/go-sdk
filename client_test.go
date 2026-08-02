@@ -25,6 +25,7 @@ type recordedRequest struct {
 type testResponse struct {
 	status      int
 	contentType string
+	headers     map[string]string
 	body        []byte
 }
 
@@ -51,6 +52,9 @@ func newTestFixture(t *testing.T, response testResponse, opts ...Option) testFix
 			contentType = "application/json"
 		}
 		w.Header().Set("content-type", contentType)
+		for key, value := range response.headers {
+			w.Header().Set(key, value)
+		}
 		status := response.status
 		if status == 0 {
 			status = http.StatusOK
@@ -176,6 +180,24 @@ func TestClientRequestBodies(t *testing.T) {
 			wantBody: map[string]any{"source": testSource, "format": "avif", "q": float64(50), "effort": float64(0)},
 		},
 		{
+			name: "compress sends quality target",
+			act: func(c *Client) error {
+				_, err := c.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+				return err
+			},
+			wantPath: "/v1/compress",
+			wantBody: map[string]any{"source": testSource, "format": "webp", "quality_target": 0.95},
+		},
+		{
+			name: "convert sends quality target",
+			act: func(c *Client) error {
+				_, err := c.Convert(context.Background(), testSource, "avif", ConvertParams{QualityTarget: 0.9, Strip: true})
+				return err
+			},
+			wantPath: "/v1/convert",
+			wantBody: map[string]any{"source": testSource, "format": "avif", "quality_target": 0.9, "strip": true},
+		},
+		{
 			name: "crop sends region including zero origin",
 			act: func(c *Client) error {
 				_, err := c.Crop(context.Background(), testSource, 0, 0, 100, 50, CropParams{Format: "png"})
@@ -298,6 +320,67 @@ func TestClientDelivery(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, result.Bytes)
 		require.Equal(t, map[string]any{"sha256": "abc", "bytes_written": float64(42)}, result.Receipt)
+	})
+}
+
+func TestClientQualityReport(t *testing.T) {
+	t.Parallel()
+
+	qualityHeaders := map[string]string{
+		"X-Pictomancer-Quality-Target":   "0.95",
+		"X-Pictomancer-Quality-Achieved": "0.9530",
+		"X-Pictomancer-Quality-Q-Final":  "62",
+		"X-Pictomancer-Quality-Encodes":  "5",
+	}
+	wantReport := &QualityReport{Target: 0.95, Achieved: 0.9530, QFinal: 62, Encodes: 5}
+
+	t.Run("parses quality headers on inline delivery", func(t *testing.T) {
+		t.Parallel()
+		fx := newTestFixture(t, testResponse{contentType: "image/webp", headers: qualityHeaders, body: testImageBytes})
+
+		result, err := fx.client.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+
+		require.NoError(t, err)
+		require.Equal(t, testImageBytes, result.Bytes)
+		require.Equal(t, wantReport, result.Quality)
+	})
+
+	t.Run("parses quality headers alongside a receipt", func(t *testing.T) {
+		t.Parallel()
+		fx := newTestFixture(t, testResponse{headers: qualityHeaders, body: []byte(`{"sha256":"abc"}`)})
+		delivery := NewPutURLDelivery("https://bucket.example.com/key")
+
+		result, err := fx.client.Convert(context.Background(), testSource, "avif", ConvertParams{QualityTarget: 0.95, Delivery: delivery})
+
+		require.NoError(t, err)
+		require.Equal(t, map[string]any{"sha256": "abc"}, result.Receipt)
+		require.Equal(t, wantReport, result.Quality)
+	})
+
+	t.Run("leaves quality nil when no search ran", func(t *testing.T) {
+		t.Parallel()
+		fx := newTestFixture(t, testResponse{contentType: "image/webp", body: testImageBytes})
+
+		result, err := fx.client.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+
+		require.NoError(t, err)
+		require.Equal(t, testImageBytes, result.Bytes)
+		require.Nil(t, result.Quality)
+	})
+
+	t.Run("errors on a malformed quality header", func(t *testing.T) {
+		t.Parallel()
+		malformed := map[string]string{
+			"X-Pictomancer-Quality-Target":   "0.95",
+			"X-Pictomancer-Quality-Achieved": "not-a-float",
+			"X-Pictomancer-Quality-Q-Final":  "62",
+			"X-Pictomancer-Quality-Encodes":  "5",
+		}
+		fx := newTestFixture(t, testResponse{contentType: "image/webp", headers: malformed, body: testImageBytes})
+
+		_, err := fx.client.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+
+		require.ErrorContains(t, err, "X-Pictomancer-Quality-Achieved")
 	})
 }
 
