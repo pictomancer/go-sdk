@@ -9,6 +9,7 @@ type CompressParams struct {
 	Q             int            `json:"q,omitempty"`
 	QualityTarget float64        `json:"quality_target,omitempty"`
 	Strip         bool           `json:"strip,omitempty"`
+	Autorot       bool           `json:"autorot,omitempty"`
 	Extra         map[string]any `json:"-"`
 	Delivery      *Delivery      `json:"delivery,omitempty"`
 }

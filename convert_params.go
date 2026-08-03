@@ -12,6 +12,7 @@ type ConvertParams struct {
 	Strip         bool           `json:"strip,omitempty"`
 	Lossless      bool           `json:"lossless,omitempty"`
 	Effort        *int           `json:"effort,omitempty"`
+	Autorot       bool           `json:"autorot,omitempty"`
 	Extra         map[string]any `json:"-"`
 	Delivery      *Delivery      `json:"delivery,omitempty"`
 }

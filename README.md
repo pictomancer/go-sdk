@@ -71,7 +71,7 @@ client.Analyze(ctx, source)
 client.Resize(ctx, source, pictomancer.ResizeParams{Scale: 0.5, Format: "webp"})
 client.Compress(ctx, source, pictomancer.CompressParams{Q: 80})
 client.Convert(ctx, source, "avif", pictomancer.ConvertParams{Q: 50, Effort: pictomancer.Int(2)})
-client.Crop(ctx, source, 0, 0, 100, 100, pictomancer.CropParams{Format: "png"})
+client.Crop(ctx, source, pictomancer.CropParams{X: pictomancer.Int(0), Y: pictomancer.Int(0), Width: pictomancer.Int(100), Height: pictomancer.Int(100), Format: "png"})
 client.Pipeline(ctx, source, []pictomancer.PipelineOperation{
 	{Type: "resize", Params: map[string]string{"scale": "0.5"}},
 	{Type: "convert", Params: map[string]string{"format": "webp"}},
@@ -79,6 +79,41 @@ client.Pipeline(ctx, source, []pictomancer.PipelineOperation{
 ```
 
 Operations return an `OpResult`: `Bytes` holds the optimized image for inline delivery, `Receipt` holds the JSON receipt for `put_url`/`callback` deliveries.
+
+### Geometry ops: smart crop, trim, fill, autorot
+
+**Breaking in v0.4.0**: `Crop`'s `x, y, width, height int` positional args moved into `CropParams` as `X, Y, Width, Height *int` (pointers, since 0 is a legitimate corner distinct from unset). Migrate:
+
+```go
+// Before (< v0.4.0)
+client.Crop(ctx, src, 10, 10, 100, 100, pictomancer.CropParams{})
+
+// After (>= v0.4.0)
+client.Crop(ctx, src, pictomancer.CropParams{X: pictomancer.Int(10), Y: pictomancer.Int(10), Width: pictomancer.Int(100), Height: pictomancer.Int(100)})
+```
+
+`CropParams` has three mutually exclusive modes:
+
+```go
+// Manual: exact rectangle.
+client.Crop(ctx, source, pictomancer.CropParams{X: pictomancer.Int(0), Y: pictomancer.Int(0), Width: pictomancer.Int(100), Height: pictomancer.Int(100)})
+
+// Smart: Gravity picks the window. One of "attention", "entropy", "centre".
+client.Crop(ctx, source, pictomancer.CropParams{Gravity: "attention", Width: pictomancer.Int(200), Height: pictomancer.Int(200)})
+
+// Trim: removes a uniform background border. Threshold defaults to 10.0 server-side.
+client.Crop(ctx, source, pictomancer.CropParams{Trim: true, Threshold: 5.0})
+```
+
+`ResizeParams` gains a fill mode: set `Width` + `Height` (instead of `Scale`/`ScaleX`/`ScaleY`) to resize and smart-crop to exact dimensions in one call; `Gravity` defaults to `"attention"`.
+
+```go
+client.Resize(ctx, source, pictomancer.ResizeParams{Width: pictomancer.Int(200), Height: pictomancer.Int(150), Gravity: "entropy"})
+```
+
+All four params structs (`ResizeParams`, `CompressParams`, `ConvertParams`, `CropParams`) have an `Autorot bool` field to apply EXIF orientation before processing.
+
+When a crop actually trims, the response carries `X-Pictomancer-Trim-Left/-Top/-Width/-Height` headers (read them off the raw HTTP response if you need them; `OpResult` doesn't surface headers today).
 
 ### Perceptual quality target
 

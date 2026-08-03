@@ -85,15 +85,11 @@ func (c *Client) Convert(ctx context.Context, source, format string, params Conv
 	return c.op(ctx, "/v1/convert", body, params.Delivery)
 }
 
-func (c *Client) Crop(ctx context.Context, source string, x, y, width, height int, params CropParams) (OpResult, error) {
+func (c *Client) Crop(ctx context.Context, source string, params CropParams) (OpResult, error) {
 	body, err := buildBody(source, params, params.Extra)
 	if err != nil {
 		return OpResult{}, err
 	}
-	body["x"] = x
-	body["y"] = y
-	body["width"] = width
-	body["height"] = height
 	return c.op(ctx, "/v1/crop", body, params.Delivery)
 }
 

@@ -200,7 +200,9 @@ func TestClientRequestBodies(t *testing.T) {
 		{
 			name: "crop sends region including zero origin",
 			act: func(c *Client) error {
-				_, err := c.Crop(context.Background(), testSource, 0, 0, 100, 50, CropParams{Format: "png"})
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					X: Int(0), Y: Int(0), Width: Int(100), Height: Int(50), Format: "png",
+				})
 				return err
 			},
 			wantPath: "/v1/crop",
@@ -208,6 +210,82 @@ func TestClientRequestBodies(t *testing.T) {
 				"source": testSource, "x": float64(0), "y": float64(0),
 				"width": float64(100), "height": float64(50), "format": "png",
 			},
+		},
+		{
+			name: "crop smart mode sends gravity without x/y",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					Width: Int(200), Height: Int(200), Gravity: "attention",
+				})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{
+				"source": testSource, "width": float64(200), "height": float64(200), "gravity": "attention",
+			},
+		},
+		{
+			name: "crop trim mode sends threshold without dims",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{Trim: true, Threshold: 5.0})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{"source": testSource, "trim": true, "threshold": 5.0},
+		},
+		{
+			name: "crop sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					X: Int(0), Y: Int(0), Width: Int(100), Height: Int(100), Autorot: true,
+				})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{
+				"source": testSource, "x": float64(0), "y": float64(0),
+				"width": float64(100), "height": float64(100), "autorot": true,
+			},
+		},
+		{
+			name: "resize sends fill mode params",
+			act: func(c *Client) error {
+				_, err := c.Resize(context.Background(), testSource, ResizeParams{
+					Width: Int(200), Height: Int(150), Gravity: "entropy",
+				})
+				return err
+			},
+			wantPath: "/v1/resize",
+			wantBody: map[string]any{
+				"source": testSource, "width": float64(200), "height": float64(150), "gravity": "entropy",
+			},
+		},
+		{
+			name: "resize sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Resize(context.Background(), testSource, ResizeParams{Scale: 0.5, Autorot: true})
+				return err
+			},
+			wantPath: "/v1/resize",
+			wantBody: map[string]any{"source": testSource, "scale": 0.5, "autorot": true},
+		},
+		{
+			name: "compress sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Compress(context.Background(), testSource, CompressParams{Format: "webp", Autorot: true})
+				return err
+			},
+			wantPath: "/v1/compress",
+			wantBody: map[string]any{"source": testSource, "format": "webp", "autorot": true},
+		},
+		{
+			name: "convert sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Convert(context.Background(), testSource, "avif", ConvertParams{Autorot: true})
+				return err
+			},
+			wantPath: "/v1/convert",
+			wantBody: map[string]any{"source": testSource, "format": "avif", "autorot": true},
 		},
 		{
 			name: "pipeline sends the operation chain",
