@@ -361,6 +361,28 @@ func TestClientRequestBodies(t *testing.T) {
 			wantPath: "/v1/compress",
 			wantBody: map[string]any{"source": testSource, "format": "png", "palette": true},
 		},
+		{
+			name: "optimize_generated sends only source by default",
+			act: func(c *Client) error {
+				_, err := c.OptimizeGenerated(context.Background(), testSource, OptimizeGeneratedParams{})
+				return err
+			},
+			wantPath: "/v1/optimize_generated",
+			wantBody: map[string]any{"source": testSource},
+		},
+		{
+			name: "optimize_generated sends format, max_dimension and explicit strip false",
+			act: func(c *Client) error {
+				_, err := c.OptimizeGenerated(context.Background(), testSource, OptimizeGeneratedParams{
+					Format: "avif", MaxDimension: 1600, Strip: Bool(false),
+				})
+				return err
+			},
+			wantPath: "/v1/optimize_generated",
+			wantBody: map[string]any{
+				"source": testSource, "format": "avif", "max_dimension": float64(1600), "strip": false,
+			},
+		},
 	}
 
 	for _, tc := range cases {

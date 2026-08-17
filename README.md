@@ -145,6 +145,14 @@ if result.Quality != nil {
 
 Supported for `jpeg`, `webp` and `avif` outputs; on convert it is also invalid with `Lossless: true`. Not available inside pipelines. `Quality` is nil when no search ran - either no `QualityTarget` was sent, or the input already met the target and came back untouched (`X-Pig-Billed: 0`).
 
+## AI-generated images: one call to web-ready
+
+Image generators (gpt-image, DALL-E, Flux, Midjourney, Stable Diffusion) return 2-8 MB PNGs. optimize_generated returns the same picture as web-ready webp (default), avif, jpeg or png: metadata stripped, transparency kept, optional max_dimension cap (never upscales), optional q or quality_target. Same price as convert; a result that is not smaller is returned free.
+
+```go
+client.OptimizeGenerated(ctx, source, pictomancer.OptimizeGeneratedParams{Format: "avif", MaxDimension: 1600})
+```
+
 ### Delivery targets
 
 ```go
