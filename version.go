@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const Version = "0.4.0"
+const Version = "0.5.0"
 
 func userAgent() string {
 	return fmt.Sprintf(

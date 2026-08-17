@@ -288,6 +288,49 @@ func TestClientRequestBodies(t *testing.T) {
 			wantBody: map[string]any{"source": testSource, "format": "avif", "autorot": true},
 		},
 		{
+			name: "resize sends sharpen",
+			act: func(c *Client) error {
+				_, err := c.Resize(context.Background(), testSource, ResizeParams{Scale: 0.5, Sharpen: true})
+				return err
+			},
+			wantPath: "/v1/resize",
+			wantBody: map[string]any{"source": testSource, "scale": 0.5, "sharpen": true},
+		},
+		{
+			name: "compress sends denoise",
+			act: func(c *Client) error {
+				_, err := c.Compress(context.Background(), testSource, CompressParams{Format: "webp", Denoise: 2})
+				return err
+			},
+			wantPath: "/v1/compress",
+			wantBody: map[string]any{"source": testSource, "format": "webp", "denoise": float64(2)},
+		},
+		{
+			name: "convert sends equalize",
+			act: func(c *Client) error {
+				_, err := c.Convert(context.Background(), testSource, "avif", ConvertParams{Equalize: true})
+				return err
+			},
+			wantPath: "/v1/convert",
+			wantBody: map[string]any{"source": testSource, "format": "avif", "equalize": true},
+		},
+		{
+			name: "crop sends enhance modifiers",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					X: Int(0), Y: Int(0), Width: Int(100), Height: Int(100),
+					Denoise: 1, Equalize: true, Sharpen: true,
+				})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{
+				"source": testSource, "x": float64(0), "y": float64(0),
+				"width": float64(100), "height": float64(100),
+				"denoise": float64(1), "equalize": true, "sharpen": true,
+			},
+		},
+		{
 			name: "pipeline sends the operation chain",
 			act: func(c *Client) error {
 				ops := []PipelineOperation{

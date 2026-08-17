@@ -115,6 +115,17 @@ All four params structs (`ResizeParams`, `CompressParams`, `ConvertParams`, `Cro
 
 When a crop actually trims, the response carries `X-Pictomancer-Trim-Left/-Top/-Width/-Height` headers (read them off the raw HTTP response if you need them; `OpResult` doesn't surface headers today).
 
+### Enhance: denoise, auto-contrast, sharpen
+
+All four params structs also have `Denoise int`, `Equalize bool` and `Sharpen bool`, opt-in modifiers applied in a fixed order: `autorot -> denoise -> equalize -> operation -> sharpen`. Base price, no surcharge.
+
+```go
+client.Convert(ctx, source, "webp", pictomancer.ConvertParams{Denoise: 2, Equalize: true})
+client.Resize(ctx, source, pictomancer.ResizeParams{Scale: 0.5, Sharpen: true})
+```
+
+`Denoise` is a median filter, radius 1-3 (window 3x3 to 7x7); the server returns 422 outside that range. `Equalize` auto-contrasts the value channel only - hue and saturation are preserved. `Sharpen` runs an unsharp mask after the operation with libvips defaults. A `compress` that grows because of these modifiers is still billed (`X-Pig-Billed: 1`), unlike a plain no-gain compress.
+
 ### Perceptual quality target
 
 Instead of guessing a `Q`, ask compress/convert for the smallest file with SSIM >= target. The server binary-searches the encoder quality and reports the outcome in `X-Pictomancer-Quality-*` headers, surfaced as `OpResult.Quality`:
