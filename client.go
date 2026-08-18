@@ -85,15 +85,19 @@ func (c *Client) Convert(ctx context.Context, source, format string, params Conv
 	return c.op(ctx, "/v1/convert", body, params.Delivery)
 }
 
-func (c *Client) Crop(ctx context.Context, source string, x, y, width, height int, params CropParams) (OpResult, error) {
+func (c *Client) OptimizeGenerated(ctx context.Context, source string, params OptimizeGeneratedParams) (OpResult, error) {
 	body, err := buildBody(source, params, params.Extra)
 	if err != nil {
 		return OpResult{}, err
 	}
-	body["x"] = x
-	body["y"] = y
-	body["width"] = width
-	body["height"] = height
+	return c.op(ctx, "/v1/optimize_generated", body, params.Delivery)
+}
+
+func (c *Client) Crop(ctx context.Context, source string, params CropParams) (OpResult, error) {
+	body, err := buildBody(source, params, params.Extra)
+	if err != nil {
+		return OpResult{}, err
+	}
 	return c.op(ctx, "/v1/crop", body, params.Delivery)
 }
 
@@ -112,19 +116,24 @@ func (c *Client) op(ctx context.Context, path string, body map[string]any, deliv
 	if err != nil {
 		return OpResult{}, err
 	}
+	quality, err := newQualityReport(res.header)
+	if err != nil {
+		return OpResult{}, err
+	}
 	if delivery.inline() {
-		return OpResult{Bytes: res.body}, nil
+		return OpResult{Bytes: res.body, Quality: quality}, nil
 	}
 	receipt, err := decodeJSON[map[string]any](res.body)
 	if err != nil {
 		return OpResult{}, err
 	}
-	return OpResult{Receipt: receipt}, nil
+	return OpResult{Receipt: receipt, Quality: quality}, nil
 }
 
 type httpResult struct {
 	status int
 	body   []byte
+	header http.Header
 }
 
 func (c *Client) roundTrip(ctx context.Context, method, path string, payload map[string]any) (httpResult, error) {
@@ -154,7 +163,11 @@ func (c *Client) roundTrip(ctx context.Context, method, path string, payload map
 	if status < http.StatusOK || status >= http.StatusMultipleChoices {
 		return httpResult{}, newAPIError(status, errorDetail(call.BodyRaw))
 	}
-	return httpResult{status: status, body: call.BodyRaw}, nil
+	header := http.Header{}
+	call.Res.RangeHeaders(func(key, value string) {
+		header.Add(key, value)
+	})
+	return httpResult{status: status, body: call.BodyRaw, header: header}, nil
 }
 
 // buildBody merges the params struct (via its JSON tags) with free-form

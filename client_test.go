@@ -25,6 +25,7 @@ type recordedRequest struct {
 type testResponse struct {
 	status      int
 	contentType string
+	headers     map[string]string
 	body        []byte
 }
 
@@ -51,6 +52,9 @@ func newTestFixture(t *testing.T, response testResponse, opts ...Option) testFix
 			contentType = "application/json"
 		}
 		w.Header().Set("content-type", contentType)
+		for key, value := range response.headers {
+			w.Header().Set(key, value)
+		}
 		status := response.status
 		if status == 0 {
 			status = http.StatusOK
@@ -176,15 +180,154 @@ func TestClientRequestBodies(t *testing.T) {
 			wantBody: map[string]any{"source": testSource, "format": "avif", "q": float64(50), "effort": float64(0)},
 		},
 		{
+			name: "compress sends quality target",
+			act: func(c *Client) error {
+				_, err := c.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+				return err
+			},
+			wantPath: "/v1/compress",
+			wantBody: map[string]any{"source": testSource, "format": "webp", "quality_target": 0.95},
+		},
+		{
+			name: "convert sends quality target",
+			act: func(c *Client) error {
+				_, err := c.Convert(context.Background(), testSource, "avif", ConvertParams{QualityTarget: 0.9, Strip: true})
+				return err
+			},
+			wantPath: "/v1/convert",
+			wantBody: map[string]any{"source": testSource, "format": "avif", "quality_target": 0.9, "strip": true},
+		},
+		{
 			name: "crop sends region including zero origin",
 			act: func(c *Client) error {
-				_, err := c.Crop(context.Background(), testSource, 0, 0, 100, 50, CropParams{Format: "png"})
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					X: Int(0), Y: Int(0), Width: Int(100), Height: Int(50), Format: "png",
+				})
 				return err
 			},
 			wantPath: "/v1/crop",
 			wantBody: map[string]any{
 				"source": testSource, "x": float64(0), "y": float64(0),
 				"width": float64(100), "height": float64(50), "format": "png",
+			},
+		},
+		{
+			name: "crop smart mode sends gravity without x/y",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					Width: Int(200), Height: Int(200), Gravity: "attention",
+				})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{
+				"source": testSource, "width": float64(200), "height": float64(200), "gravity": "attention",
+			},
+		},
+		{
+			name: "crop trim mode sends threshold without dims",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{Trim: true, Threshold: 5.0})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{"source": testSource, "trim": true, "threshold": 5.0},
+		},
+		{
+			name: "crop sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					X: Int(0), Y: Int(0), Width: Int(100), Height: Int(100), Autorot: true,
+				})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{
+				"source": testSource, "x": float64(0), "y": float64(0),
+				"width": float64(100), "height": float64(100), "autorot": true,
+			},
+		},
+		{
+			name: "resize sends fill mode params",
+			act: func(c *Client) error {
+				_, err := c.Resize(context.Background(), testSource, ResizeParams{
+					Width: Int(200), Height: Int(150), Gravity: "entropy",
+				})
+				return err
+			},
+			wantPath: "/v1/resize",
+			wantBody: map[string]any{
+				"source": testSource, "width": float64(200), "height": float64(150), "gravity": "entropy",
+			},
+		},
+		{
+			name: "resize sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Resize(context.Background(), testSource, ResizeParams{Scale: 0.5, Autorot: true})
+				return err
+			},
+			wantPath: "/v1/resize",
+			wantBody: map[string]any{"source": testSource, "scale": 0.5, "autorot": true},
+		},
+		{
+			name: "compress sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Compress(context.Background(), testSource, CompressParams{Format: "webp", Autorot: true})
+				return err
+			},
+			wantPath: "/v1/compress",
+			wantBody: map[string]any{"source": testSource, "format": "webp", "autorot": true},
+		},
+		{
+			name: "convert sends autorot",
+			act: func(c *Client) error {
+				_, err := c.Convert(context.Background(), testSource, "avif", ConvertParams{Autorot: true})
+				return err
+			},
+			wantPath: "/v1/convert",
+			wantBody: map[string]any{"source": testSource, "format": "avif", "autorot": true},
+		},
+		{
+			name: "resize sends sharpen",
+			act: func(c *Client) error {
+				_, err := c.Resize(context.Background(), testSource, ResizeParams{Scale: 0.5, Sharpen: true})
+				return err
+			},
+			wantPath: "/v1/resize",
+			wantBody: map[string]any{"source": testSource, "scale": 0.5, "sharpen": true},
+		},
+		{
+			name: "compress sends denoise",
+			act: func(c *Client) error {
+				_, err := c.Compress(context.Background(), testSource, CompressParams{Format: "webp", Denoise: 2})
+				return err
+			},
+			wantPath: "/v1/compress",
+			wantBody: map[string]any{"source": testSource, "format": "webp", "denoise": float64(2)},
+		},
+		{
+			name: "convert sends equalize",
+			act: func(c *Client) error {
+				_, err := c.Convert(context.Background(), testSource, "avif", ConvertParams{Equalize: true})
+				return err
+			},
+			wantPath: "/v1/convert",
+			wantBody: map[string]any{"source": testSource, "format": "avif", "equalize": true},
+		},
+		{
+			name: "crop sends enhance modifiers",
+			act: func(c *Client) error {
+				_, err := c.Crop(context.Background(), testSource, CropParams{
+					X: Int(0), Y: Int(0), Width: Int(100), Height: Int(100),
+					Denoise: 1, Equalize: true, Sharpen: true,
+				})
+				return err
+			},
+			wantPath: "/v1/crop",
+			wantBody: map[string]any{
+				"source": testSource, "x": float64(0), "y": float64(0),
+				"width": float64(100), "height": float64(100),
+				"denoise": float64(1), "equalize": true, "sharpen": true,
 			},
 		},
 		{
@@ -217,6 +360,28 @@ func TestClientRequestBodies(t *testing.T) {
 			},
 			wantPath: "/v1/compress",
 			wantBody: map[string]any{"source": testSource, "format": "png", "palette": true},
+		},
+		{
+			name: "optimize_generated sends only source by default",
+			act: func(c *Client) error {
+				_, err := c.OptimizeGenerated(context.Background(), testSource, OptimizeGeneratedParams{})
+				return err
+			},
+			wantPath: "/v1/optimize_generated",
+			wantBody: map[string]any{"source": testSource},
+		},
+		{
+			name: "optimize_generated sends format, max_dimension and explicit strip false",
+			act: func(c *Client) error {
+				_, err := c.OptimizeGenerated(context.Background(), testSource, OptimizeGeneratedParams{
+					Format: "avif", MaxDimension: 1600, Strip: Bool(false),
+				})
+				return err
+			},
+			wantPath: "/v1/optimize_generated",
+			wantBody: map[string]any{
+				"source": testSource, "format": "avif", "max_dimension": float64(1600), "strip": false,
+			},
 		},
 	}
 
@@ -298,6 +463,67 @@ func TestClientDelivery(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, result.Bytes)
 		require.Equal(t, map[string]any{"sha256": "abc", "bytes_written": float64(42)}, result.Receipt)
+	})
+}
+
+func TestClientQualityReport(t *testing.T) {
+	t.Parallel()
+
+	qualityHeaders := map[string]string{
+		"X-Pictomancer-Quality-Target":   "0.95",
+		"X-Pictomancer-Quality-Achieved": "0.9530",
+		"X-Pictomancer-Quality-Q-Final":  "62",
+		"X-Pictomancer-Quality-Encodes":  "5",
+	}
+	wantReport := &QualityReport{Target: 0.95, Achieved: 0.9530, QFinal: 62, Encodes: 5}
+
+	t.Run("parses quality headers on inline delivery", func(t *testing.T) {
+		t.Parallel()
+		fx := newTestFixture(t, testResponse{contentType: "image/webp", headers: qualityHeaders, body: testImageBytes})
+
+		result, err := fx.client.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+
+		require.NoError(t, err)
+		require.Equal(t, testImageBytes, result.Bytes)
+		require.Equal(t, wantReport, result.Quality)
+	})
+
+	t.Run("parses quality headers alongside a receipt", func(t *testing.T) {
+		t.Parallel()
+		fx := newTestFixture(t, testResponse{headers: qualityHeaders, body: []byte(`{"sha256":"abc"}`)})
+		delivery := NewPutURLDelivery("https://bucket.example.com/key")
+
+		result, err := fx.client.Convert(context.Background(), testSource, "avif", ConvertParams{QualityTarget: 0.95, Delivery: delivery})
+
+		require.NoError(t, err)
+		require.Equal(t, map[string]any{"sha256": "abc"}, result.Receipt)
+		require.Equal(t, wantReport, result.Quality)
+	})
+
+	t.Run("leaves quality nil when no search ran", func(t *testing.T) {
+		t.Parallel()
+		fx := newTestFixture(t, testResponse{contentType: "image/webp", body: testImageBytes})
+
+		result, err := fx.client.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+
+		require.NoError(t, err)
+		require.Equal(t, testImageBytes, result.Bytes)
+		require.Nil(t, result.Quality)
+	})
+
+	t.Run("errors on a malformed quality header", func(t *testing.T) {
+		t.Parallel()
+		malformed := map[string]string{
+			"X-Pictomancer-Quality-Target":   "0.95",
+			"X-Pictomancer-Quality-Achieved": "not-a-float",
+			"X-Pictomancer-Quality-Q-Final":  "62",
+			"X-Pictomancer-Quality-Encodes":  "5",
+		}
+		fx := newTestFixture(t, testResponse{contentType: "image/webp", headers: malformed, body: testImageBytes})
+
+		_, err := fx.client.Compress(context.Background(), testSource, CompressParams{Format: "webp", QualityTarget: 0.95})
+
+		require.ErrorContains(t, err, "X-Pictomancer-Quality-Achieved")
 	})
 }
 
