@@ -383,6 +383,26 @@ func TestClientRequestBodies(t *testing.T) {
 				"source": testSource, "format": "avif", "max_dimension": float64(1600), "strip": false,
 			},
 		},
+		{
+			name: "remove_background sends only source by default",
+			act: func(c *Client) error {
+				_, err := c.RemoveBackground(context.Background(), testSource, RemoveBackgroundParams{})
+				return err
+			},
+			wantPath: "/v1/remove_background",
+			wantBody: map[string]any{"source": testSource},
+		},
+		{
+			name: "remove_background sends format and q",
+			act: func(c *Client) error {
+				_, err := c.RemoveBackground(context.Background(), testSource, RemoveBackgroundParams{
+					Format: "webp", Q: 80,
+				})
+				return err
+			},
+			wantPath: "/v1/remove_background",
+			wantBody: map[string]any{"source": testSource, "format": "webp", "q": float64(80)},
+		},
 	}
 
 	for _, tc := range cases {

@@ -153,6 +153,14 @@ Image generators (gpt-image, DALL-E, Flux, Midjourney, Stable Diffusion) return 
 client.OptimizeGenerated(ctx, source, pictomancer.OptimizeGeneratedParams{Format: "avif", MaxDimension: 1600})
 ```
 
+## Background removal
+
+remove_background cuts out the subject and returns it on a transparent background as png (default), webp or avif; jpeg is not allowed because it has no alpha. The output keeps transparency. Optional q (1-100) applies to webp and avif only; png ignores it.
+
+```go
+client.RemoveBackground(ctx, source, pictomancer.RemoveBackgroundParams{Format: "webp", Q: 80})
+```
+
 ### Delivery targets
 
 ```go
