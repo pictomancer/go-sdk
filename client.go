@@ -93,6 +93,14 @@ func (c *Client) OptimizeGenerated(ctx context.Context, source string, params Op
 	return c.op(ctx, "/v1/optimize_generated", body, params.Delivery)
 }
 
+func (c *Client) RemoveBackground(ctx context.Context, source string, params RemoveBackgroundParams) (OpResult, error) {
+	body, err := buildBody(source, params, params.Extra)
+	if err != nil {
+		return OpResult{}, err
+	}
+	return c.op(ctx, "/v1/remove_background", body, params.Delivery)
+}
+
 func (c *Client) Crop(ctx context.Context, source string, params CropParams) (OpResult, error) {
 	body, err := buildBody(source, params, params.Extra)
 	if err != nil {
